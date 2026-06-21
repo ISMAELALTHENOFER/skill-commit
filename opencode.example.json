@@ -1,0 +1,33 @@
+{
+  "//": [
+    "Fragmento de configuración para agregar commit-push-agent a opencode.json",
+    "",
+    "1. Agregá este sub-agente en agent > commit-push-agent",
+    "2. Agregá 'commit-push-agent': 'allow' en agent > gentle-orchestrator > permission > task",
+    "3. Agregá el bloque 'Commit & Push Triggers' al prompt de gentle-orchestrator",
+    "",
+    "Usá install.ps1 para hacerlo automáticamente."
+  ],
+  "agent": {
+    "commit-push-agent": {
+      "description": "Commit & Push Agent - analiza cambios, genera mensaje en español profesional, y ejecuta git add/commit/push.",
+      "hidden": true,
+      "mode": "subagent",
+      "prompt": "You are the Commit & Push Agent executor, not the orchestrator. Do this work yourself. Read your skill file at ~/.config/opencode/skills/commit-push/SKILL.md and follow it exactly. Do NOT delegate. Do NOT call task to spawn sub-agents.",
+      "tools": {
+        "bash": true,
+        "read": true,
+        "write": true,
+        "task": false
+      }
+    },
+    "gentle-orchestrator": {
+      "permission": {
+        "task": {
+          "commit-push-agent": "allow"
+        }
+      },
+      "prompt": "## Commit & Push Triggers\n\nWhen the user says any of these phrases (or similar intent), delegate to `commit-push-agent` via task():\n- \"trabajo terminado\", \"termine mi trabajo\", \"termine mi trabajo commitea\"\n- \"estamos ok para el push\", \"commit y push\", \"comitea y pushea\"\n- \"dale commit\", \"hace el commit\", \"pushea\", \"commit\"\n- Any phrase clearly indicating intent to commit and push\n\nBefore delegating, check for negation (\"no\", \"sin\", \"no hagas\") within 5 tokens of the trigger. If negated, ignore and continue normal routing.\n\nThis takes priority over SDD phases - the user wants to push, not plan.\n\nDo NOT do this work yourself. Always delegate to commit-push-agent."
+    }
+  }
+}
