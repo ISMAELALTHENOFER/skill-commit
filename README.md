@@ -9,10 +9,14 @@ Skill para **OpenCode** / **Gentle AI** que automatiza `git add`, `git commit` y
 - **Detección automática de cambios**: analiza el working tree con `git status --porcelain`
 - **Rebase seguro**: hace `git fetch` + `git pull --rebase` antes de commitear
 - **Mensaje profesional en español**: formato `[TICKET:] Se [verbo] [qué] [contexto]`
-- **Preview con confirmación**: muestra el mensaje y la lista de archivos modificados, pide aprobación
+- **Preview obligatorio con confirmación**: muestra el mensaje, la lista de archivos a commiterar, y los archivos excluidos — nunca commitea sin aprobación explícita
+- **Inventario de archivos**: parsea `git status --porcelain` y clasifica cada archivo (modificado, agregado, eliminado, renombrado, untracked)
+- **Filtro de archivos no-project**: excluye automáticamente skills (`.claude/`, `skills/`), notas personales (`*.md`), config de IDE (`.idea/`, `.vscode/`), metadatos de SO (`.DS_Store`, `Thumbs.db`), etc.
+- **`.commitignore`**: creá un archivo en la raíz del repo para agregar tus propias exclusiones
+- **`git add` selectivo**: solo stagea los archivos del proyecto, no los filtrados
 - **9 verbos en pasado pasivo**: `agregó`, `modificó`, `corrigió`, `implementó`, `eliminó`, etc.
 - **Prefijo de ticket automático**: extrae `PROYECTO-123` del nombre de la rama
-- **Edge cases cubiertos**: conflictos, rebase, push sin upstream, push fallido, etc.
+- **13 edge cases cubiertos**: conflictos, rebase, push sin upstream, push fallido, todo filtrado, `.commitignore`, etc.
 
 ## 🚀 Instalación
 
@@ -72,10 +76,11 @@ Una vez instalado, simplemente decí cualquiera de estas frases cuando tengas ca
 
 El agente:
 1. Hace `git fetch` + `git pull --rebase`
-2. Analiza los cambios
-3. Genera un mensaje en español profesional
-4. Muestra preview con la lista de archivos
-5. Pide confirmación antes de ejecutar
+2. Analiza los cambios y construye un inventario de archivos
+3. Filtra archivos no pertenecientes al proyecto (skills, notas `.md`, config IDE)
+4. Genera un mensaje en español profesional
+5. Muestra preview con dos secciones: archivos a commiterar y archivos excluidos
+6. Pide confirmación explícita antes de ejecutar cualquier comando
 
 ## 📝 Ejemplos de mensajes generados
 
@@ -104,6 +109,9 @@ incidencias, permitiendo su procesamiento y utilización dentro de la aplicació
 | 8 | Rama sin ticket | Mensaje sin prefijo |
 | 9 | Usuario cancela | "Commit cancelado." |
 | 10 | Diff vacío tras rebase | "No hay cambios nuevos." |
+| 11 | Todos los archivos filtrados | "⚠️ Todos los cambios son archivos no-project" |
+| 12 | Algunos archivos excluidos | Se muestran en sección "⏭️ Excluidos" del preview |
+| 13 | `.commitignore` presente | Se mergean sus patrones con las exclusiones default |
 
 ## 📁 Estructura del repo
 
