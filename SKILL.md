@@ -6,7 +6,7 @@ user-invocable: false
 license: MIT
 metadata:
   author: gentleman-programming
-  version: "1.0"
+  version: "1.1"
   delegate_only: true
 ---
 
@@ -25,10 +25,11 @@ Do NOT call the Skill tool. You are the executor — execute.
 ## Purpose
 
 You automate git commit and push for a Git working tree. You analyze local
-changes, pull remote changes (`git fetch` + `git pull --rebase`), generate a
-professional Spanish commit message (passive "Se + verbo" style), show a preview
-with file list, ask for confirmation, and on approval execute
-`git add -A && git commit -m "..." && git push`.
+changes, pull remote changes (`git fetch` + `git pull --rebase`), build a file
+inventory, filter out non-project files (skills, personal notes, config, etc.),
+show a preview with ALL proposed files and any excluded files,
+ALWAYS ask for explicit user confirmation, and on approval execute
+selective `git add` + `git commit` + `git push`.
 
 ## Workflow
 
@@ -70,16 +71,88 @@ Run `git status --porcelain` and inspect:
 | Empty (no output) | Print "No hay cambios para commitear." and exit |
 | Contains `UU` or `DD` (unmerged paths) | Print "❌ Hay conflictos sin resolver. Resolvelos manualmente antes de commitear." and exit |
 | Contains `REBASE_HEAD` or rebase in progress marker | Print "❌ Hay un rebase en progreso. Resolvelo o abortalo manualmente." and exit |
-| Any other output (staged/unstaged/untracked) | Continue to Step 4 |
+| Any other output (staged/unstaged/untracked) | Continue to Step 3.5 |
 
-### Step 4: Get diff and branch info
+### Step 3.5: Build file inventory
+
+Run `git status --porcelain` and parse EVERY line to build a structured
+inventory of each changed file with its status:
+
+```
+# Porcelain indicators
+M  = modified (staged)
+ M = modified (unstaged)
+A  = added (staged)
+?? = untracked
+D  = deleted
+ R = renamed
+```
+
+From this output, build the following structured lists:
+
+- `FILES_MODIFIED`: list of modified files (staged or unstaged)
+- `FILES_ADDED`: list of added/new files
+- `FILES_DELETED`: list of deleted files
+- `FILES_UNTRACKED`: list of untracked files
+- `FILES_RENAMED`: list of renamed files
+
+### Step 3.6: Filter non-project files
+
+Apply exclusion rules to separate project files from non-project files.
+Non-project files are files that exist in the working tree but do NOT belong
+to the project itself — personal notes, skill development files, IDE config,
+OS metadata, etc.
+
+Check for a `.commitignore` file in the repo root:
+```bash
+Test-Path -LiteralPath ".commitignore"
+```
+
+If it exists, read its patterns (one per line, `#` for comments) and merge
+them with the default exclusion patterns below.
+
+**Default exclusion patterns** (always applied — see full list in the
+[Default Exclusion Patterns](#default-exclusion-patterns) section):
+
+| Pattern | Reason |
+|---------|--------|
+| `.claude/**` | Claude/OpenCode skill files and config |
+| `.config/opencode/**` | OpenCode editor configuration |
+| `skills/**` | AI skill files |
+| `*.md` | Markdown files (personal notes, not project docs) |
+| `.idea/**` | JetBrains IDE config |
+| `.vscode/**` | VS Code config |
+| `**/.DS_Store` | macOS metadata |
+| `**/Thumbs.db` | Windows thumbnail cache |
+
+After filtering, produce:
+
+- `INCLUDED_FILES`: files that pass the filter (will be offered for staging)
+- `EXCLUDED_FILES`: files that match exclusion patterns (will NOT be staged)
+
+Print a summary line:
+
+```
+📋 Archivos del proyecto: {count_included}  |  ⏭️  Excluidos (no-project): {count_excluded}
+```
+
+If ALL files are excluded (no project files to commit), print:
+
+```
+⚠️  Todos los cambios son archivos no pertenecientes al proyecto.
+Nada para commitear. Revisá tus exclusiones en .commitignore si es necesario.
+```
+and exit cleanly.
+
+### Step 4: Get diff, branch and ticket info
 
 Run these commands to gather context:
 
 ```bash
 BRANCH=$(git branch --show-current)
-STATS=$(git diff --stat HEAD)
 DIFF=$(git diff HEAD)
+DIFF_STAGED=$(git diff --cached)
+FULL_DIFF="$DIFF$DIFF_STAGED"
 # Ticket key extraction — adapt to your shell
 # Linux/macOS: grep -oP '([A-Z]+-\d+)'
 # PowerShell: Select-String -Pattern '([A-Z]+-\d+)' -AllMatches
@@ -89,15 +162,14 @@ TICKET=$(echo "$BRANCH" | grep -oP '([A-Z]+-\d+)' | head -1)
 ```
 
 - `BRANCH`: current branch name.
-- `STATS`: file change summary (files changed, insertions, deletions).
-- `DIFF`: full diff content for message generation.
+- `FULL_DIFF`: complete diff (staged + unstaged) for message generation.
 - `TICKET`: ticket key extracted from branch name (e.g., `REM-13927`). Empty if no match.
 
-If `DIFF` is empty after the rebase (all changes were already upstream), print
-"No hay cambios nuevos después del rebase." and exit.
+If `FULL_DIFF` is empty after the rebase (all changes were already upstream),
+print "No hay cambios nuevos después del rebase." and exit.
 
-If only untracked files exist (`??` entries only), note this and ask the user
-in the preview whether they want to include them.
+If the inventory has ONLY untracked files (`FILES_UNTRACKED` only), note this
+and ask the user in the preview whether they want to include them.
 
 ### Step 5: Generate commit message
 
@@ -134,25 +206,41 @@ Se agregó la funcionalidad para recuperar y mapear los comentarios de las incid
 Technical terms (file names, component names, variable names, library names)
 SHOULD be wrapped in backticks.
 
-### Step 6: Show preview and confirm
+### Step 6: Show preview and confirm (MANDATORY — NEVER SKIPPED)
+
+The user ALWAYS sees the full preview with complete file lists.
+There is NO auto-commit path. This step is NEVER bypassed.
+
+Build the preview using the filtered inventories from Steps 3.5–3.6:
+
+- `INCLUDED_FILES` with their status labels (modificado, agregado, eliminado)
+- `EXCLUDED_FILES` shown in a separate section so the user knows what was filtered
+
+If there are excluded files, include a note that the user can create a
+`.commitignore` file in the repo root to customize exclusions.
 
 Display the preview in a clear box:
 
 ```
-┌─────────────────────────────────────────┐
-│  Mensaje del commit:                    │
-│  {mensaje}                              │
-│                                         │
-│  Rama: {branch}                         │
-│                                         │
-│  Archivos:                              │
-│    {file1} (modificado)                 │
-│    {file2} (agregado)                   │
-│    {file3} (eliminado)                  │
-│    ...                                  │
-│                                         │
-│  ¿Confirmás el commit? [s/N]            │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  📝 Mensaje del commit:                      │
+│  {mensaje}                                   │
+│                                              │
+│  🌿 Rama: {branch}                           │
+│                                              │
+│  📦 Archivos a commiterar ({count_included}):│
+│    {file1} ({status})                        │
+│    {file2} ({status})                        │
+│    ...                                       │
+│                                              │
+│  ⏭️  Archivos excluidos ({count_excluded}):  │
+│    {excluded1}                               │
+│    {excluded2}                               │
+│    ...                                       │
+│                                              │
+│  ¿Confirmás el commit con estos archivos?    │
+│  [s/N]                                       │
+└──────────────────────────────────────────────┘
 ```
 
 Wait for user input. Accept positive replies: `s`, `sí`, `si`, `yes`, `y`, `ok`,
@@ -161,13 +249,22 @@ Wait for user input. Accept positive replies: `s`, `sí`, `si`, `yes`, `y`, `ok`
 - If positive → proceed to Step 7.
 - If anything else (or empty) → print "Commit cancelado." and exit cleanly.
 
-### Step 7: Execute add → commit → push
+### Step 7: Execute selective add → commit → push
 
-Run sequentially:
+Stage ONLY the included (non-excluded) files. Use one of these approaches:
 
+**Option A — Explicit file list** (most precise):
 ```bash
-git add -A
+git add -- <included_file1> <included_file2> ...
 ```
+
+**Option B — Pathspec exclusions** (cleaner for many files):
+```bash
+git add -A -- . ':(exclude).claude/**' ':(exclude)*.md' ':(exclude)skills/**' ':(exclude).idea/**' ':(exclude).vscode/**'
+```
+
+Use Option A when there are few included files. Use Option B when there are
+many included files and you want to keep the command short.
 
 If `git add` fails → print error and exit.
 
@@ -229,10 +326,48 @@ Pattern: [TICKET_KEY:] Se [verbo] [qué] [contexto/dónde], [propósito opcional
 | 4 | No upstream branch | `git push` fails with upstream error | Print manual `git push --set-upstream` command |
 | 5 | Push rejected (non-fast-forward) | `git push` returns rejection | Print error, commit is local, safe |
 | 6 | Network failure on fetch | `git fetch` fails | Warn user, continue in local-only mode |
-| 7 | Untracked files only | `git status --porcelain` shows `??` only | Include in `git add -A`, mention in preview |
+| 7 | Untracked files only | `git status --porcelain` shows `??` only | Ask user in preview whether to include them |
 | 8 | Branch name has no ticket key | regex `([A-Z]+-\d+)` no match | Omit ticket prefix from message |
 | 9 | User cancels at confirmation | negative or empty response | Print "Commit cancelado.", exit cleanly |
 | 10 | Diff is empty after pull --rebase | `git diff HEAD` empty after rebase | Print "No hay cambios nuevos después del rebase." and exit |
+| 11 | All files filtered out | All files match exclusion patterns | Print "⚠️  Todos los cambios son archivos no pertenecientes al proyecto." and exit |
+| 12 | Some files excluded | `git status --porcelain` has files matching exclusions | Show in "⏭️  Archivos excluidos" section, do NOT stage |
+| 13 | `.commitignore` exists | File exists in repo root | Read patterns and merge with default exclusions |
+
+## Default Exclusion Patterns
+
+These patterns are ALWAYS applied to filter out non-project files before
+showing the preview and staging:
+
+| Pattern | Reason |
+|---------|--------|
+| `.claude/**` | Claude/OpenCode skill files and config |
+| `.config/opencode/**` | OpenCode editor configuration |
+| `skills/**` | AI skill files (agent instructions) |
+| `*.md` | Markdown files (personal notes, not project docs) |
+| `.idea/**` | JetBrains IDE configuration |
+| `.vscode/**` | VS Code configuration |
+| `**/.DS_Store` | macOS filesystem metadata |
+| `**/Thumbs.db` | Windows thumbnail cache |
+
+### `.commitignore` file
+
+Users can extend or override the default exclusions by creating a
+`.commitignore` file in the repo root. Each line is a pathspec pattern
+(same syntax as `.gitignore`). Lines starting with `#` are comments.
+
+Example `.commitignore`:
+```
+# Project-specific exclusions
+tmp/
+personal/
+*.log
+build/
+secrets/
+```
+
+The `.commitignore` patterns are merged with the defaults. User patterns
+take precedence — if the same pattern appears in both, the user version wins.
 
 ## Decision Tree (Git Workflow)
 
@@ -249,18 +384,25 @@ Pattern: [TICKET_KEY:] Se [verbo] [qué] [contexto/dónde], [propósito opcional
    ├─ empty → "No hay cambios", exit
    ├─ has UU/DD → "Conflictos sin resolver", exit
    ├─ rebase in progress → "Rebase en progreso", exit
-   └─ has changes → continue
+   └─ has changes → continue to 3.5
 
-3. git diff HEAD --stat && git diff HEAD
-   ├─ empty after rebase → "No hay cambios nuevos", exit
+3.5 Build file inventory (parse porcelain → status + path per file)
+   └─ classify: modified, added, deleted, untracked, renamed
+
+3.6 Apply exclusion filters
+   ├─ check .commitignore (if exists) → merge with defaults
+   ├─ separate files → INCLUDED vs EXCLUDED
+   ├─ all excluded → "Todos no-project", exit
+   └─ has included → continue to 4
+
+4. git diff HEAD + branch + ticket
+   ├─ diff empty after rebase → "No hay cambios nuevos", exit
    └─ has diff → continue
-
-4. Extract branch name + ticket key: /([A-Z]+-\d+)/
 
 5. Generate message: [TICKET:] Se [verbo] [qué] [contexto]
 
-6. Show preview panel → ask "¿Confirmás? [s/N]"
-   ├─ yes → git add -A && git commit -m "..." && git push
+6. Show preview panel → included files + excluded files → ask "¿Confirmás? [s/N]"
+   ├─ yes → selective git add (included only) && git commit && git push
    │   ├─ add fails → error, exit
    │   ├─ commit fails → error, exit
    │   ├─ push succeeds → "✅ Push exitoso"
