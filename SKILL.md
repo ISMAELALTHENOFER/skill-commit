@@ -153,13 +153,23 @@ BRANCH=$(git branch --show-current)
 DIFF=$(git diff HEAD)
 DIFF_STAGED=$(git diff --cached)
 FULL_DIFF="$DIFF$DIFF_STAGED"
-# Ticket key extraction — adapt to your shell
-# Linux/macOS: grep -oP '([A-Z]+-\d+)'
-# PowerShell: Select-String -Pattern '([A-Z]+-\d+)' -AllMatches
-# Nushell: ... | parse -r '([A-Z]+-\d+)'
-# Use whatever works on your platform to extract the first match
-TICKET=$(echo "$BRANCH" | grep -oP '([A-Z]+-\d+)' | head -1)
 ```
+
+Then extract TICKET from $BRANCH. Use the correct shell syntax for your runtime:
+
+- **Linux/macOS (bash)**:
+  ```bash
+  TICKET=$(echo "$BRANCH" | grep -oP '([A-Z]+-\d+)' | head -1)
+  ```
+
+- **Windows (PowerShell 7+)** — use THIS on win32:
+  ```powershell
+  $TICKET = if ($env:BRANCH -match '([A-Z]+\-\d+)') { $matches[1] } else { '' }
+  ```
+
+- **Manual fallback** (if neither works): inspect the branch name string and manually extract the first match of the pattern `XXX-12345` (uppercase letters, dash, digits).
+
+`TICKET` MUST be extracted and printed to the preview. If you cannot extract it, set `TICKET=""` and print a warning that the ticket could not be parsed.
 
 - `BRANCH`: current branch name.
 - `FULL_DIFF`: complete diff (staged + unstaged) for message generation.
@@ -190,8 +200,9 @@ Build the message using this mandatory pattern:
 - `corrigió` — fixed a bug
 - `refactorizó` — refactored without behavior change
 
-**Ticket prefix**: If `TICKET` is non-empty, prepend `"{TICKET}: "`. Otherwise
-omit the prefix.
+**Ticket prefix**: Si `TICKET` no está vacío, **SIEMPRE** ponelo al inicio del mensaje en el formato `"{TICKET}: "`. Si está vacío, omití el prefijo.
+
+⚠️ **REQUISITO OBLIGATORIO**: el ticket debe aparecer en el mensaje final. Si el branch tiene ticket pero no pudiste extraerlo automáticamente, inspeccioná el nombre del branch manualmente y extraelo. No es opcional saltearlo.
 
 **Examples** (must follow this exact style):
 
