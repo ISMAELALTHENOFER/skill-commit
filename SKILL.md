@@ -6,7 +6,7 @@ user-invocable: false
 license: MIT
 metadata:
   author: gentleman-programming
-  version: "1.1"
+  version: "1.2"
   delegate_only: true
 ---
 
@@ -28,8 +28,28 @@ You automate git commit and push for a Git working tree. You analyze local
 changes, pull remote changes (`git fetch` + `git pull --rebase`), build a file
 inventory, filter out non-project files (skills, personal notes, config, etc.),
 show a preview with ALL proposed files and any excluded files,
-ALWAYS ask for explicit user confirmation, and on approval execute
-selective `git add` + `git commit` + `git push`.
+and ALWAYS ask for explicit user confirmation before executing anything.
+
+## ⛔ CONFIRMATION HARD GATE (READ THIS FIRST)
+
+**BAJO NINGUNA CIRCUNSTANCIA** podés ejecutar `git add`, `git commit`, o
+`git push` sin que el usuario haya respondido EXPLÍCITAMENTE a la pregunta de
+confirmación con una respuesta positiva.
+
+No existen atajos. No existe modo "auto". No existe "el usuario ya dijo que sí
+antes". Cada commit requiere confirmación explícita en ese momento.
+
+Si llegaste hasta el preview y el usuario NO respondió — **STOP**. No hagas
+nada. No infieras consentimiento. No asumas. ESPERÁ.
+
+La ÚNICA forma de pasar a Step 7 es que el usuario haya respondido `s`, `sí`,
+`si`, `yes`, `y`, `ok`, `dale`, `confirmo`, o `daly` DESPUÉS de ver el preview.
+
+Cualquier otra cosa — incluyendo silencio, un mensaje ambiguo, o un "dale"
+anterior al preview — NO es confirmación. Cancelá el commit.
+
+On explicit approval only, execute selective `git add` + `git commit` +
+`git push`.
 
 ## Workflow
 
@@ -153,13 +173,23 @@ BRANCH=$(git branch --show-current)
 DIFF=$(git diff HEAD)
 DIFF_STAGED=$(git diff --cached)
 FULL_DIFF="$DIFF$DIFF_STAGED"
-# Ticket key extraction — adapt to your shell
-# Linux/macOS: grep -oP '([A-Z]+-\d+)'
-# PowerShell: Select-String -Pattern '([A-Z]+-\d+)' -AllMatches
-# Nushell: ... | parse -r '([A-Z]+-\d+)'
-# Use whatever works on your platform to extract the first match
-TICKET=$(echo "$BRANCH" | grep -oP '([A-Z]+-\d+)' | head -1)
 ```
+
+Then extract TICKET from $BRANCH. Use the correct shell syntax for your runtime:
+
+- **Linux/macOS (bash)**:
+  ```bash
+  TICKET=$(echo "$BRANCH" | grep -oP '([A-Z]+-\d+)' | head -1)
+  ```
+
+- **Windows (PowerShell 7+)** — use THIS on win32:
+  ```powershell
+  $TICKET = if ($env:BRANCH -match '([A-Z]+\-\d+)') { $matches[1] } else { '' }
+  ```
+
+- **Manual fallback** (if neither works): inspect the branch name string and manually extract the first match of the pattern `XXX-12345` (uppercase letters, dash, digits).
+
+`TICKET` MUST be extracted and printed to the preview. If you cannot extract it, set `TICKET=""` and print a warning that the ticket could not be parsed.
 
 - `BRANCH`: current branch name.
 - `FULL_DIFF`: complete diff (staged + unstaged) for message generation.
@@ -190,8 +220,9 @@ Build the message using this mandatory pattern:
 - `corrigió` — fixed a bug
 - `refactorizó` — refactored without behavior change
 
-**Ticket prefix**: If `TICKET` is non-empty, prepend `"{TICKET}: "`. Otherwise
-omit the prefix.
+**Ticket prefix**: Si `TICKET` no está vacío, **SIEMPRE** ponelo al inicio del mensaje en el formato `"{TICKET}: "`. Si está vacío, omití el prefijo.
+
+⚠️ **REQUISITO OBLIGATORIO**: el ticket debe aparecer en el mensaje final. Si el branch tiene ticket pero no pudiste extraerlo automáticamente, inspeccioná el nombre del branch manualmente y extraelo. No es opcional saltearlo.
 
 **Examples** (must follow this exact style):
 
@@ -206,10 +237,16 @@ Se agregó la funcionalidad para recuperar y mapear los comentarios de las incid
 Technical terms (file names, component names, variable names, library names)
 SHOULD be wrapped in backticks.
 
-### Step 6: Show preview and confirm (MANDATORY — NEVER SKIPPED)
+### Step 6: Show preview and confirm (⛔ HARD GATE — TOTALMENTE OBLIGATORIO)
+
+> **⚠️ LEE ESTO DOS VECES**: Este paso es un HARD GATE. NO se puede saltar.
+> NO se puede automatizar. NO se puede inferir consentimiento. La ÚNICA manera
+> de pasar a Step 7 es que el usuario responda EXPLÍCITAMENTE con una respuesta
+> positiva DESPUÉS de ver el preview. No hay excepciones.
 
 The user ALWAYS sees the full preview with complete file lists.
-There is NO auto-commit path. This step is NEVER bypassed.
+There is NO auto-commit path. This step is NEVER bypassed — not in any mode,
+not for any reason, not even if the user said "dale" before the preview appeared.
 
 Build the preview using the filtered inventories from Steps 3.5–3.6:
 
@@ -243,13 +280,34 @@ Display the preview in a clear box:
 └──────────────────────────────────────────────┘
 ```
 
-Wait for user input. Accept positive replies: `s`, `sí`, `si`, `yes`, `y`, `ok`,
-`dale`, `confirmo`, `daly` (case-insensitive, trimmed).
+After displaying the preview, **STOP EVERYTHING and WAIT**. No sigas. No
+proceses nada más. No ejecutes ningún comando. Tu ÚNICA tarea en este momento
+es esperar la respuesta del usuario.
 
-- If positive → proceed to Step 7.
-- If anything else (or empty) → print "Commit cancelado." and exit cleanly.
+Wait for user input. Accept positive replies ONLY: `s`, `sí`, `si`, `yes`, `y`,
+`ok`, `dale`, `confirmo`, `daly` (case-insensitive, trimmed).
+
+- If positive → proceed to Step 7 ONLY AFTER explicit confirmation.
+- If **anything else** (or empty, or silence, or timeout) →
+  print "Commit cancelado." and exit cleanly. NO EXCEPCIONES.
+
+### ⛔ PRE-EXECUTION CHECKPOINT (antes de Step 7)
+
+Antes de ejecutar CUALQUIER comando `git add`, `git commit`, o `git push`,
+hacete estas tres preguntas. Si CUALQUIERA es NO, **STOP y cancelá**:
+
+1. ¿Mostré el preview completo con el mensaje y la lista de archivos?
+2. ¿El usuario respondió EXPLÍCITAMENTE con una palabra positiva (`s`, `sí`,
+   `si`, `yes`, `y`, `ok`, `dale`, `confirmo`, `daly`)?
+3. ¿Esa respuesta positiva vino DESPUÉS de que yo mostré el preview?
+
+Las tres deben ser SÍ. Si no podés responder SÍ a las tres con 100% de certeza,
+no ejecutes nada. Cancelá.
 
 ### Step 7: Execute selective add → commit → push
+
+⚠️ **RECORDATORIO**: Solo llegaste acá porque el usuario dio confirmación
+explícita. Si tenés alguna duda, volvé al checkpoint anterior.
 
 Stage ONLY the included (non-excluded) files. Use one of these approaches:
 
@@ -328,7 +386,7 @@ Pattern: [TICKET_KEY:] Se [verbo] [qué] [contexto/dónde], [propósito opcional
 | 6 | Network failure on fetch | `git fetch` fails | Warn user, continue in local-only mode |
 | 7 | Untracked files only | `git status --porcelain` shows `??` only | Ask user in preview whether to include them |
 | 8 | Branch name has no ticket key | regex `([A-Z]+-\d+)` no match | Omit ticket prefix from message |
-| 9 | User cancels at confirmation | negative or empty response | Print "Commit cancelado.", exit cleanly |
+| 9 | User cancels at confirmation | negative, empty, silence, or ambiguous response | Print "Commit cancelado.", exit cleanly. NUNCA inferir consentimiento. |
 | 10 | Diff is empty after pull --rebase | `git diff HEAD` empty after rebase | Print "No hay cambios nuevos después del rebase." and exit |
 | 11 | All files filtered out | All files match exclusion patterns | Print "⚠️  Todos los cambios son archivos no pertenecientes al proyecto." and exit |
 | 12 | Some files excluded | `git status --porcelain` has files matching exclusions | Show in "⏭️  Archivos excluidos" section, do NOT stage |
@@ -401,13 +459,18 @@ take precedence — if the same pattern appears in both, the user version wins.
 
 5. Generate message: [TICKET:] Se [verbo] [qué] [contexto]
 
-6. Show preview panel → included files + excluded files → ask "¿Confirmás? [s/N]"
-   ├─ yes → selective git add (included only) && git commit && git push
-   │   ├─ add fails → error, exit
-   │   ├─ commit fails → error, exit
-   │   ├─ push succeeds → "✅ Push exitoso"
-   │   └─ push fails
-   │       ├─ no upstream → print manual command, exit
-   │       └─ other error → "❌ Push falló. Commit local.", exit
-   └─ no → "Commit cancelado.", exit
+6. ⛔ HARD GATE: Show preview → STOP → WAIT for user response
+   ├─ user responds with explicit positive confirmation → PRE-EXECUTION CHECKPOINT
+   │   ├─ checkpoint passed (all 3 questions YES) → Step 7
+   │   └─ checkpoint failed → "Commit cancelado.", exit
+   └─ ANY other response (or silence) → "Commit cancelado.", exit
+
+7. Selective git add (included only) && git commit && git push
+7. Selective git add (included only) && git commit && git push
+   ├─ add fails → error, exit
+   ├─ commit fails → error, exit
+   ├─ push succeeds → "✅ Push exitoso"
+   └─ push fails
+       ├─ no upstream → print manual command, exit
+       └─ other error → "❌ Push falló. Commit local.", exit
 ```
