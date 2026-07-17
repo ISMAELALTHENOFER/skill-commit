@@ -5,10 +5,28 @@ disable-model-invocation: true
 user-invocable: false
 license: MIT
 metadata:
-  author: gentleman-programming
-  version: "1.2"
+  author: Ismael Althenofer
+  version: "1.3"
   delegate_only: true
 ---
+
+## Platform Support
+
+This skill works with **any AI coding agent**. Choose your platform below.
+Standalone agents (Claude Code, Cursor, Copilot, etc.) execute the workflow
+directly — no orchestration layer needed.
+
+| Agent | Installation | Execution Mode |
+|---|---|---|
+| **OpenCode / Gentle AI** | `install.ps1` or `opencode.example.json` | Orchestrator delegates → Sub-agent executes |
+| **Claude Code** | `.claude/skills/commit-push/SKILL.md` | Direct execution |
+| **Cursor** | `.cursor/rules/commit-push.mdc` | Direct execution |
+| **GitHub Copilot** | `.github/copilot-instructions.md` | Context-aware execution |
+| **Any other agent** | Read SKILL.md as custom instructions | Direct execution |
+
+### OpenCode / Gentle AI
+
+If you are running under OpenCode's agent system:
 
 > **ORCHESTRATOR GATE**: If you loaded this skill via the `skill()` tool, you are
 > the ORCHESTRATOR — STOP. Do NOT execute these instructions inline. Delegate to
@@ -16,11 +34,18 @@ metadata:
 > primitive (e.g., `task(...)`, sub-agent invocation, etc.). This skill is for
 > EXECUTORS only.
 
-## Executor Override
+**EXECUTOR OVERRIDE**: If you ARE the `commit-push-agent` sub-agent (NOT the
+orchestrator), the gate above does NOT apply to you. Continue with the phase work
+below. Do NOT delegate. Do NOT call the Skill tool. You are the executor —
+execute.
 
-If you ARE the `commit-push-agent` sub-agent (NOT the orchestrator), the gate
-above does NOT apply to you. Continue with the phase work below. Do NOT delegate.
-Do NOT call the Skill tool. You are the executor — execute.
+### Standalone Usage (Claude Code, Cursor, Copilot, and any other agent)
+
+If you loaded this file directly (not via OpenCode's `skill()` tool), you are
+both the planner AND the executor. Skip the orchestration gate above and go
+straight to the workflow. Read and execute Steps 1–7 sequentially.
+
+**You are the executor — execute.** There is no delegation layer.
 
 ## Purpose
 
