@@ -1,8 +1,15 @@
-# commit-push skill
+# commit-push: Git automation skill for AI agents
 
-Skill para **OpenCode** / **Gentle AI** que automatiza `git add`, `git commit` y `git push` con mensajes de commit profesionales en español.
+Skill para **agentes de IA** que automatiza `git add`, `git commit` y `git push`
+con mensajes de commit profesionales en español.
 
-> 🇦🇷 Genera mensajes estilo *"Se agregó…"*, *"Se corrigió…"*, con formato pasivo profesional y prefijo de ticket opcional extraído del nombre de la rama.
+> 🇦🇷 Genera mensajes estilo *"Se agregó…"*, *"Se corrigió…"*, con formato pasivo
+> profesional y prefijo de ticket opcional extraído del nombre de la rama.
+
+Compatible con: **OpenCode** · **Claude Code** · **Cursor** · **GitHub Copilot**
+· **cualquier agente AI con soporte de instrucciones personalizadas**.
+
+---
 
 ## ✨ Funcionalidades
 
@@ -18,22 +25,28 @@ Skill para **OpenCode** / **Gentle AI** que automatiza `git add`, `git commit` y
 - **Prefijo de ticket automático**: extrae `PROYECTO-123` del nombre de la rama
 - **13 edge cases cubiertos**: conflictos, rebase, push sin upstream, push fallido, todo filtrado, `.commitignore`, etc.
 
+---
+
 ## 🚀 Instalación
 
 ### Requisitos
 
-- [OpenCode](https://opencode.ai) instalado
+- Un agente de IA compatible (OpenCode, Claude Code, Cursor, Copilot, etc.)
 - Git configurado
 
-### Opción 1: Instalación automática (PowerShell)
+---
+
+### OpenCode / Gentle AI
+
+#### Opción 1: Instalación automática (PowerShell)
 
 ```powershell
 .\install.ps1
 ```
 
-### Opción 2: Manual
+#### Opción 2: Manual
 
-1. Copiá `SKILL.md` a tu directorio de skills:
+1. Copiá `SKILL.md` al directorio de skills:
 
 ```bash
 mkdir -p ~/.config/opencode/skills/commit-push
@@ -61,6 +74,79 @@ cp SKILL.md ~/.config/opencode/skills/commit-push/SKILL.md
 
 4. Agregá los triggers al prompt del orchestrator (ver sección **Commit & Push Triggers** en `opencode.example.json`).
 
+---
+
+### Claude Code
+
+1. Copiá `SKILL.md` al directorio de skills de Claude:
+
+```bash
+mkdir -p ~/.claude/skills/commit-push
+cp SKILL.md ~/.claude/skills/commit-push/SKILL.md
+```
+
+2. Referenciá la skill desde tu `CLAUDE.md` o archivo de instrucciones del proyecto.
+
+O simplemente incluí el contenido de `SKILL.md` en tu `CLAUDE.md` del proyecto si preferís tenerlo inline.
+
+---
+
+### Cursor
+
+1. Copiá `SKILL.md` como regla de Cursor:
+
+```bash
+mkdir -p .cursor/rules
+cp SKILL.md .cursor/rules/commit-push.mdc
+```
+
+2. Cursor cargará la regla automáticamente cuando trabajes en el repo.
+
+O agregá el contenido a tu `.cursorrules` raíz si preferís un archivo único.
+
+---
+
+### GitHub Copilot
+
+Agregá el contenido de `SKILL.md` a `.github/copilot-instructions.md` en tu repo:
+
+```bash
+mkdir -p .github
+cat SKILL.md >> .github/copilot-instructions.md
+```
+
+Copilot usará estas instrucciones como contexto cuando le pidas commits.
+
+---
+
+### Cualquier otro agente
+
+La mayoría de los agentes AI modernos soportan instrucciones personalizadas.
+Simplemente proveé el contenido de `SKILL.md` como instrucción del agente, ya sea:
+
+- En un archivo de instrucciones del proyecto
+- En tu prompt de sistema o configuración del agente
+- Como parte de un archivo de reglas del asistente
+
+La skill fue diseñada para ser **autónoma**: cualquier agente puede leerla y
+ejecutar Steps 1–7 directamente sin necesidad de infraestructura adicional.
+
+---
+
+### Instalación multi-agente con install.ps1
+
+El script `install.ps1` detecta automáticamente qué agentes tenés instalados
+y copia la skill a todos los destinos compatibles:
+
+```powershell
+.\install.ps1              # Auto-detecta todos los agentes instalados
+.\install.ps1 -Agent OpenCode     # Solo OpenCode
+.\install.ps1 -Agent ClaudeCode   # Solo Claude Code
+.\install.ps1 -Agent All          # Instala en todos los agentes detectados
+```
+
+---
+
 ## 🎯 Cómo se usa
 
 Una vez instalado, simplemente decí cualquiera de estas frases cuando tengas cambios para commitear:
@@ -82,6 +168,8 @@ El agente:
 5. Muestra preview con dos secciones: archivos a commiterar y archivos excluidos
 6. Pide confirmación explícita antes de ejecutar cualquier comando
 
+---
+
 ## 📝 Ejemplos de mensajes generados
 
 ```
@@ -94,6 +182,8 @@ verificación.
 Se agregó la funcionalidad para recuperar y mapear los comentarios de las
 incidencias, permitiendo su procesamiento y utilización dentro de la aplicación.
 ```
+
+---
 
 ## 🛡️ Edge cases manejados
 
@@ -113,17 +203,33 @@ incidencias, permitiendo su procesamiento y utilización dentro de la aplicació
 | 12 | Algunos archivos excluidos | Se muestran en sección "⏭️ Excluidos" del preview |
 | 13 | `.commitignore` presente | Se mergean sus patrones con las exclusiones default |
 
+---
+
 ## 📁 Estructura del repo
 
 ```
 skill-commit/
-├── SKILL.md                # La skill en sí
+├── SKILL.md                # La skill en sí — instrucciones para cualquier agente AI
 ├── README.md               # Este archivo
-├── install.ps1             # Script de instalación automática
-├── opencode.example.json   # Fragmento de configuración de ejemplo
+├── install.ps1             # Script de instalación multi-agente
+├── opencode.example.json   # Configuración de ejemplo para OpenCode
 └── .atl/
     └── skill-registry.md   # Registry de skills instaladas
 ```
+
+---
+
+## 🔧 Compatibilidad
+
+| Plataforma | Ruta de instalación | Modo de ejecución |
+|---|---|---|
+| OpenCode / Gentle AI | `~/.config/opencode/skills/commit-push/SKILL.md` | Delegación orchestrator → sub‑agent |
+| Claude Code | `~/.claude/skills/commit-push/SKILL.md` | Ejecución directa |
+| Cursor | `.cursor/rules/commit-push.mdc` | Ejecución directa |
+| GitHub Copilot | `.github/copilot-instructions.md` | Ejecución contextual |
+| Cualquier agente | Instrucciones personalizadas del agente | Ejecución directa |
+
+---
 
 ## 📄 Licencia
 
